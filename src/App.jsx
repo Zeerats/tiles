@@ -216,17 +216,25 @@ function renderFillImage(regionData, colors) {
 
 // --- Print B&W tile ---
 
-function printTileBW(activeIds, strokeW) {
+function printTileBW(activeIds, strokeW, { cols = 6, rows = 6, showGrid = true, showHeader = true } = {}) {
   const paths = LINE_ELEMENTS.filter((el) => activeIds.has(el.id))
     .map((el) =>
       `<path d="${el.d}" fill="none" stroke="#000" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"/>`
     ).join("\n");
 
-  const tileSvg = (size) => `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${S} ${S}" style="display:block">${paths}</svg>`;
+  // A4 printable area with 8mm margins: 194mm x 281mm
+  const pageW = 194;
+  const pageH = 281;
+  const headerH = showHeader ? 14 : 0;
+  const availH = pageH - headerH;
 
-  const gridSize = 4;
-  const gridTileSize = 120;
-  const gridCells = Array(gridSize * gridSize).fill(tileSvg(gridTileSize)).join("\n");
+  // Tile size = min of (width / cols, available height / rows) so it always fits
+  const tileSize = Math.floor(Math.min(pageW / cols, availH / rows) * 10) / 10;
+  const gridW = tileSize * cols;
+  const gridH = tileSize * rows;
+
+  const borderStyle = showGrid ? "0.5px dashed #bbb" : "none";
+  const outerBorder = showGrid ? "1px solid #aaa" : "none";
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -234,75 +242,51 @@ function printTileBW(activeIds, strokeW) {
   <meta charset="UTF-8">
   <title>Tile Pattern - Print</title>
   <style>
-    @page { size: A4; margin: 15mm; }
+    @page { size: A4; margin: 8mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      background: #f8f8f8;
+      background: #f5f5f5;
       color: #222;
+    }
+    .screen-wrap {
       display: flex;
       justify-content: center;
-      padding: 40px 20px;
+      padding: 32px 20px;
     }
     .page {
       background: #fff;
-      max-width: 700px;
-      width: 100%;
-      padding: 48px;
+      width: ${pageW}mm;
+      padding: 0;
       box-shadow: 0 1px 8px rgba(0,0,0,0.08);
     }
     .header {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      border-bottom: 2px solid #111;
-      padding-bottom: 12px;
-      margin-bottom: 32px;
+      padding: 2mm 0 2mm 0;
+      border-bottom: 0.5px solid #ccc;
+      margin-bottom: 1mm;
     }
-    .header h1 {
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: -0.3px;
+    .header h1 { font-size: 11pt; font-weight: 700; }
+    .header span { font-size: 7pt; color: #999; }
+    .cut-grid {
+      display: grid;
+      grid-template-columns: repeat(${cols}, ${tileSize}mm);
+      grid-template-rows: repeat(${rows}, ${tileSize}mm);
+      width: ${gridW}mm;
+      border: ${outerBorder};
     }
-    .header span {
-      font-size: 11px;
-      color: #999;
-    }
-    .section-label {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      color: #999;
-      margin-bottom: 12px;
-    }
-    .single-tile {
-      display: flex;
-      justify-content: center;
-      padding: 24px;
-      margin-bottom: 36px;
-      border: 1px solid #eee;
-      background: #fafafa;
-    }
-    .grid-section { margin-bottom: 32px; }
-    .tile-grid {
-      display: inline-grid;
-      grid-template-columns: repeat(${gridSize}, ${gridTileSize}px);
-      border: 1px solid #ddd;
-    }
-    .tile-grid svg {
-      border: 0.5px solid #eee;
-    }
-    .cut-note {
-      margin-top: 20px;
-      font-size: 11px;
-      color: #aaa;
-      border-top: 1px solid #eee;
-      padding-top: 12px;
+    .cut-grid svg {
+      width: ${tileSize}mm;
+      height: ${tileSize}mm;
+      display: block;
+      border: ${borderStyle};
     }
     .print-btn {
       position: fixed;
-      top: 20px;
-      right: 20px;
+      top: 16px;
+      right: 16px;
       padding: 10px 24px;
       font-size: 13px;
       font-weight: 600;
@@ -312,38 +296,30 @@ function printTileBW(activeIds, strokeW) {
       background: #111;
       color: #fff;
       box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      transition: background 0.15s;
+      z-index: 10;
     }
     .print-btn:hover { background: #333; }
     @media print {
       .print-btn { display: none; }
-      body { background: #fff; padding: 0; }
-      .page { box-shadow: none; padding: 0; max-width: 100%; }
+      body { background: #fff; }
+      .screen-wrap { padding: 0; }
+      .page { box-shadow: none; }
     }
   </style>
 </head>
 <body>
   <button class="print-btn" onclick="window.print()">Print / Save PDF</button>
-  <div class="page">
-    <div class="header">
-      <h1>Tile Pattern</h1>
-      <span>Cut along grid lines. Paint and assemble as mosaic.</span>
-    </div>
-
-    <div class="section-label">Single Tile</div>
-    <div class="single-tile">
-      ${tileSvg(200)}
-    </div>
-
-    <div class="grid-section">
-      <div class="section-label">${gridSize} x ${gridSize} Tiled Preview</div>
-      <div class="tile-grid">
-        ${gridCells}
+  <div class="screen-wrap">
+    <div class="page">
+      ${showHeader ? `<div class="header">
+        <h1>Ela's Tile Pattern</h1>
+        <span>${cols} x ${rows}${showGrid ? " — cut along dashed lines" : ""}</span>
+      </div>` : ""}
+      <div class="cut-grid">
+        ${Array(cols * rows).fill(0).map(() =>
+          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${S} ${S}">${paths}</svg>`
+        ).join("\n")}
       </div>
-    </div>
-
-    <div class="cut-note">
-      Each tile is designed to connect seamlessly at all edges. Cut tiles to equal size and arrange in any grid layout.
     </div>
   </div>
 </body>
@@ -390,6 +366,25 @@ function EdgeDots({ size }) {
 
 // --- Main ---
 
+const PRESETS = [
+  { name: "Flowing", ids: ["c_tl", "c_br"], color: "#2D7DD2", width: 2.5 },
+  { name: "Weave", ids: ["c_tl", "c_br", "c_tr", "c_bl"], color: "#1ABC9C", width: 2.5 },
+  { name: "Circles", ids: ["a_tl", "a_tr", "a_bl", "a_br"], color: "#F5A623", width: 2.5 },
+  { name: "Ogee", ids: ["a_tl", "a_br", "cn_tr_m", "cn_bl_m"], color: "#9B59B6", width: 2.5 },
+  { name: "Lattice", ids: ["d1", "d2"], color: "#E8453C", width: 2.5 },
+  { name: "Diamonds", ids: ["d1", "d2", "v", "h"], color: "#97CC04", width: 1.5 },
+  { name: "Petals", ids: ["a_tl", "a_br", "c_tr", "c_bl"], color: "#F06292", width: 2.5 },
+  { name: "Rosette", ids: ["cn_tl_m", "cn_tr_m", "cn_bl_m", "cn_br_m", "circle"], color: "#2D7DD2", width: 2.5 },
+  { name: "Celtic", ids: ["s_v", "s_h"], color: "#1ABC9C", width: 2.5 },
+  { name: "Basket", ids: ["c_tl_s", "c_br_s", "h", "v"], color: "#F5A623", width: 1.5 },
+  { name: "Scales", ids: ["a_tl", "a_tr", "h_b"], color: "#9B59B6", width: 2.5 },
+  { name: "Waves", ids: ["w_h", "w_v"], color: "#2D7DD2", width: 2.5 },
+  { name: "Ornate", ids: ["cn_tl_s", "cn_tr_s", "cn_bl_s", "cn_br_s", "cn_tl_m", "cn_tr_m", "cn_bl_m", "cn_br_m", "diamond"], color: "#F5A623", width: 1.5 },
+  { name: "Grid+", ids: ["v", "h", "cn_tl_s", "cn_tr_s", "cn_bl_s", "cn_br_s"], color: "#ECEFF1", width: 1.5 },
+  { name: "Ribbon", ids: ["s_v", "c_tl", "c_br"], color: "#E8453C", width: 2.5 },
+  { name: "Deco", ids: ["v", "h", "cn_tl_l", "cn_tr_l", "cn_bl_l", "cn_br_l"], color: "#F5A623", width: 2.5 },
+];
+
 export default function TileDesigner() {
   const [active, setActive] = useState(new Set(["c_tl", "c_br"]));
   const [strokeColor, setStrokeColor] = useState(STROKE_COLORS[1]);
@@ -398,6 +393,16 @@ export default function TileDesigner() {
   const [fillMode, setFillMode] = useState("random");
   const [paletteIdx, setPaletteIdx] = useState(0);
   const [colorSeed, setColorSeed] = useState(42);
+  const [printCols, setPrintCols] = useState(6);
+  const [printRows, setPrintRows] = useState(6);
+  const [printGrid, setPrintGrid] = useState(true);
+  const [printHeader, setPrintHeader] = useState(true);
+
+  const applyPreset = (preset) => {
+    setActive(new Set(preset.ids));
+    setStrokeColor(preset.color);
+    setStrokeWidth(preset.width);
+  };
 
   const toggle = (id) => {
     setActive((prev) => {
@@ -464,11 +469,39 @@ export default function TileDesigner() {
             <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
               <button onClick={randomize} style={{ ...btnStyle, background: "rgba(255,255,255,0.06)", color: "#fff" }}>↻ Randomize</button>
               <button onClick={() => setActive(new Set())} style={btnStyle}>Clear</button>
+            </div>
+
+            <div style={{ ...labelStyle, marginBottom: 5 }}>Print</div>
+            <div style={{
+              marginBottom: 14, padding: "8px 10px",
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: 6,
+            }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+                <span style={{ fontSize: 10, color: "#888", width: 32 }}>Grid</span>
+                <select value={printCols} onChange={(e) => setPrintCols(Number(e.target.value))} style={selectSmall}>
+                  {[2, 3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+                <span style={{ fontSize: 10, color: "#555" }}>x</span>
+                <select value={printRows} onChange={(e) => setPrintRows(Number(e.target.value))} style={selectSmall}>
+                  {[2, 3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+                <label style={{ fontSize: 10, color: "#888", display: "flex", alignItems: "center", gap: 3, marginLeft: 4, cursor: "pointer" }}>
+                  <input type="checkbox" checked={printGrid} onChange={(e) => setPrintGrid(e.target.checked)} style={{ accentColor: "#666" }} />
+                  Cut lines
+                </label>
+                <label style={{ fontSize: 10, color: "#888", display: "flex", alignItems: "center", gap: 3, cursor: "pointer" }}>
+                  <input type="checkbox" checked={printHeader} onChange={(e) => setPrintHeader(e.target.checked)} style={{ accentColor: "#666" }} />
+                  Title
+                </label>
+              </div>
               <button
-                onClick={() => printTileBW(active, strokeWidth)}
+                onClick={() => printTileBW(active, strokeWidth, { cols: printCols, rows: printRows, showGrid: printGrid, showHeader: printHeader })}
                 disabled={active.size === 0}
                 style={{
                   ...btnStyle,
+                  width: "100%",
                   background: active.size > 0 ? "rgba(255,255,255,0.06)" : "transparent",
                   color: active.size > 0 ? "#fff" : "#333",
                   cursor: active.size > 0 ? "pointer" : "default",
@@ -476,6 +509,35 @@ export default function TileDesigner() {
               >
                 ⎙ Print B&W
               </button>
+            </div>
+
+            <div style={{ ...labelStyle, marginBottom: 5 }}>Presets</div>
+            <div style={{ marginBottom: 14 }}>
+              <select
+                onChange={(e) => {
+                  const preset = PRESETS.find((p) => p.name === e.target.value);
+                  if (preset) applyPreset(preset);
+                  e.target.value = "";
+                }}
+                defaultValue=""
+                style={{
+                  width: "100%",
+                  padding: "6px 10px",
+                  fontSize: 11,
+                  fontFamily: "inherit",
+                  background: "#1a1a1a",
+                  color: "#ccc",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: 5,
+                  cursor: "pointer",
+                  appearance: "auto",
+                }}
+              >
+                <option value="" disabled>Choose a preset...</option>
+                {PRESETS.map((p) => (
+                  <option key={p.name} value={p.name}>{p.name}</option>
+                ))}
+              </select>
             </div>
 
             <div style={{ ...labelStyle, marginBottom: 5 }}>Stroke</div>
@@ -592,3 +654,4 @@ export default function TileDesigner() {
 const labelStyle = { fontSize: 10, textTransform: "uppercase", letterSpacing: "1.5px", color: "#555" };
 const btnStyle = { padding: "5px 12px", fontSize: 11, fontFamily: "inherit", background: "transparent", color: "#666", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 5, cursor: "pointer" };
 const btnSmall = { padding: "3px 8px", fontSize: 10, fontFamily: "inherit", background: "transparent", color: "#666", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 4, cursor: "pointer" };
+const selectSmall = { padding: "3px 6px", fontSize: 11, fontFamily: "inherit", background: "#1a1a1a", color: "#ccc", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, cursor: "pointer", width: 44 };
