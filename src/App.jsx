@@ -453,7 +453,7 @@ export default function TileDesigner() {
       fontFamily: "'JetBrains Mono', 'SF Mono', monospace", padding: 24, userSelect: "none",
     }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>◈ Tile Line Designer</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>◈ Ela's Tile Generator</h1>
         <p style={{ fontSize: 11, color: "#555", margin: "0 0 20px" }}>
           Toggle lines to compose a tile. Randomize for inspiration. Print B&W for hand-painting.
         </p>
